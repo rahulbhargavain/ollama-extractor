@@ -1,0 +1,103 @@
+<svg viewBox="0 0 980 460" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="980" height="460" fill="#ffffff"/>
+
+  <!-- Group 1 label -->
+  <text x="30" y="30" font-size="13" font-weight="600" fill="#888">1. VLM PDF Parser</text>
+  <rect x="20" y="40" width="430" height="150" rx="8" fill="none" stroke="#ddd" stroke-dasharray="4 3"/>
+
+  <!-- Group 2 label -->
+  <text x="530" y="30" font-size="13" font-weight="600" fill="#888">2. Ollama Pydantic Extractor</text>
+  <rect x="500" y="40" width="460" height="400" rx="8" fill="none" stroke="#ddd" stroke-dasharray="4 3"/>
+
+  <!-- PDFs box -->
+  <rect x="40" y="60" width="150" height="50" rx="6" fill="#eef4ff" stroke="#6b8fd6"/>
+  <text x="115" y="90" font-size="13" text-anchor="middle" fill="#25406b">Input PDFs</text>
+
+  <!-- manifest cache check -->
+  <rect x="230" y="60" width="200" height="50" rx="6" fill="#fff8e6" stroke="#d9a943"/>
+  <text x="330" y="82" font-size="12" text-anchor="middle" fill="#6b4f10">_manifest.json cache</text>
+  <text x="330" y="98" font-size="11" text-anchor="middle" fill="#6b4f10">(name, size, mtime)</text>
+
+  <!-- unchanged skip -->
+  <rect x="230" y="140" width="200" height="40" rx="6" fill="#f2f2f2" stroke="#bbb"/>
+  <text x="330" y="164" font-size="11" text-anchor="middle" fill="#555">unchanged -&gt; skip conversion</text>
+
+  <!-- Docling VLM -->
+  <rect x="40" y="140" width="150" height="70" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
+  <text x="115" y="164" font-size="12" text-anchor="middle" fill="#1f5c33">Docling VLM pipeline</text>
+  <text x="115" y="180" font-size="11" text-anchor="middle" fill="#1f5c33">granite-docling-258M</text>
+  <text x="115" y="196" font-size="10" text-anchor="middle" fill="#1f5c33">(CUDA if available, else CPU)</text>
+
+  <!-- Markdown output -->
+  <rect x="255" y="220" width="150" height="50" rx="6" fill="#eef4ff" stroke="#6b8fd6"/>
+  <text x="330" y="250" font-size="13" text-anchor="middle" fill="#25406b">parsed_markdown/*.md</text>
+
+  <!-- arrows group 1 -->
+  <path d="M190,85 H230" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <path d="M270,110 V140" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <text x="278" y="128" font-size="10" fill="#555">changed</text>
+  <path d="M330,110 V140" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <text x="345" y="128" font-size="10" fill="#555">unchanged</text>
+  <path d="M115,210 V235 H255" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <path d="M330,180 V220" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Extractor: prompt + schema -->
+  <rect x="530" y="60" width="180" height="60" rx="6" fill="#eef4ff" stroke="#6b8fd6"/>
+  <text x="620" y="85" font-size="12" text-anchor="middle" fill="#25406b">Prompt (from .md text)</text>
+  <text x="620" y="103" font-size="12" text-anchor="middle" fill="#25406b">+ Pydantic schema</text>
+
+  <path d="M330,270 V310 H530" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Ollama call -->
+  <rect x="530" y="150" width="180" height="60" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
+  <text x="620" y="175" font-size="12" text-anchor="middle" fill="#1f5c33">Ollama /api/generate</text>
+  <text x="620" y="193" font-size="11" text-anchor="middle" fill="#1f5c33">format = JSON schema</text>
+
+  <path d="M620,120 V150" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Network/parse failure -->
+  <rect x="740" y="150" width="200" height="60" rx="6" fill="#fdeaea" stroke="#c96a6a"/>
+  <text x="840" y="172" font-size="11" text-anchor="middle" fill="#7a2626">Timeout / connection error /</text>
+  <text x="840" y="188" font-size="11" text-anchor="middle" fill="#7a2626">unparseable response</text>
+  <text x="840" y="204" font-size="10" text-anchor="middle" fill="#7a2626">logged, retried up to max_retries</text>
+
+  <path d="M710,175 H740" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <path d="M840,150 V130 H710" stroke="#c96a6a" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Validate -->
+  <rect x="530" y="240" width="180" height="60" rx="6" fill="#fff8e6" stroke="#d9a943"/>
+  <text x="620" y="265" font-size="12" text-anchor="middle" fill="#6b4f10">schema.model_validate()</text>
+  <text x="620" y="283" font-size="11" text-anchor="middle" fill="#6b4f10">(per-item if many=True)</text>
+
+  <path d="M620,210 V240" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Validation failure -->
+  <rect x="740" y="240" width="200" height="60" rx="6" fill="#fdeaea" stroke="#c96a6a"/>
+  <text x="840" y="262" font-size="11" text-anchor="middle" fill="#7a2626">ValidationError</text>
+  <text x="840" y="278" font-size="11" text-anchor="middle" fill="#7a2626">error fed back into prompt,</text>
+  <text x="840" y="294" font-size="10" text-anchor="middle" fill="#7a2626">re-sent (self-healing retry)</text>
+
+  <path d="M710,265 H740" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <path d="M840,240 V225 H620 V240" stroke="#c96a6a" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Success -->
+  <rect x="530" y="330" width="180" height="60" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
+  <text x="620" y="355" font-size="12" text-anchor="middle" fill="#1f5c33">Validated Pydantic</text>
+  <text x="620" y="373" font-size="12" text-anchor="middle" fill="#1f5c33">instance(s)</text>
+
+  <path d="M620,300 V330" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Give up -->
+  <rect x="740" y="330" width="200" height="60" rx="6" fill="#f2f2f2" stroke="#bbb"/>
+  <text x="840" y="355" font-size="12" text-anchor="middle" fill="#555">None</text>
+  <text x="840" y="373" font-size="10" text-anchor="middle" fill="#555">(retries exhausted)</text>
+
+  <path d="M840,300 V330" stroke="#555" fill="none" marker-end="url(#arrow)" stroke-dasharray="3 2"/>
+  <path d="M840,210 V240" stroke="#555" fill="none" stroke-dasharray="3 2"/>
+</svg>
