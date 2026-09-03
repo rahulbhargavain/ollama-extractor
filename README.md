@@ -9,11 +9,13 @@ A toolkit for processing unstructured documents locally. It contains two indepen
 
 ## 1. VLM PDF Parser (`vlm_pdf_parser.py`)
 
-A GPU-accelerated CLI tool for converting directories of PDFs to Markdown. It features a smart caching layer that hashes file names, sizes, and modification times so you never accidentally re-run an expensive VLM pass on an unchanged file.
+A GPU-accelerated CLI tool for converting directories of PDFs to Markdown. It features a smart caching layer that hashes file names, sizes, and modification times so you never accidentally re-run an expensive VLM pass on an unchanged file. Matching is case-insensitive (`.pdf`/`.PDF`) and can optionally recurse into subdirectories.
+
+Note on the cache: the key is `(name, size, mtime)`, not a content hash. That's cheap and fine for local edit-and-rerun workflows, but a fresh `git clone` or Docker copy resets mtimes, so the first run there will look like everything changed and reconvert.
 
 ### Dependencies
 ```bash
-pip install docling torch
+pip install -r requirements.txt
 ```
 
 ### Usage (CLI)
@@ -25,11 +27,20 @@ python vlm_pdf_parser.py
 # Specify input and output directories
 python vlm_pdf_parser.py --input-dir /path/to/pdfs --output-dir /path/to/output
 
+# Also search subdirectories
+python vlm_pdf_parser.py --input-dir /path/to/pdfs --recursive
+
 # List PDFs without converting
 python vlm_pdf_parser.py --input-dir /path/to/pdfs --list
 
 # Ignore the cache and force re-conversion
 python vlm_pdf_parser.py --force
+
+# Share one global model weights cache across output dirs (default: ~/.cache/huggingface)
+python vlm_pdf_parser.py --model-cache-dir ~/.cache/huggingface
+
+# Use a different VLM (any attribute name in docling.datamodel.vlm_model_specs)
+python vlm_pdf_parser.py --model SMOLDOCLING_TRANSFORMERS
 ```
 
 ---
@@ -46,9 +57,11 @@ A robust, generic utility for structured extraction using local LLMs (via Ollama
 
 ### Dependencies
 ```bash
-pip install requests pydantic
+pip install -r requirements.txt
 ```
 *Requires Ollama running locally (default: `http://localhost:11434`).*
+
+Failures are logged via the standard `logging` module (network errors, unparseable responses, and per-item validation misses each get a `logger.warning`) rather than silently swallowed — configure `logging.basicConfig(level=logging.WARNING)` in your own script to see them. A connection failure or timeout now also retries (up to `max_retries`, unmodified prompt) instead of giving up immediately, separately from the validation-error retry path.
 
 ### Usage (Python)
 

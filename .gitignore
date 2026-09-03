@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+parsed_markdown/
+.docling_models/
