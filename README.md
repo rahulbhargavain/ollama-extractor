@@ -5,7 +5,7 @@ A toolkit for processing unstructured documents locally. It contains two indepen
 1. **VLM PDF Parser**: Converts raw PDFs into clean Markdown using IBM's Docling Vision-Language Model.
 2. **Ollama Pydantic Extractor**: Extracts strict JSON from Markdown/text using local Ollama models and Pydantic schemas.
 
-<img src="assets/flowchart.svg" width="75%" alt="PDF -> Markdown -> Ollama extraction -> validated Pydantic output flowchart">
+<img src="assets/flowchart.svg" width="100%" alt="PDF -> Markdown -> Ollama extraction -> validated Pydantic output flowchart">
 
 ---
 
