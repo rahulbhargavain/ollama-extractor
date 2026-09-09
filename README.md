@@ -106,6 +106,63 @@ for item in (results or []):
     print(item.product_id, item.price)
 ```
 
+## Reducing local compute cost: deterministic-first extraction
+
+`OllamaExtractor` always makes at least one real model call — for a 12B-class
+model that's a real GPU-pinning cost per document, and it adds up fast over a
+batch. For any source where the target fields are already anchored by real
+structure (a markdown table, a consistently-labeled line like `Total Revenue:
+Rs 1,234 Cr`, a CSV-shaped block), you don't need the LLM at all for that
+document — a plain regex/parsing pass can extract it deterministically, for
+free, with no hallucination risk. Only fall back to `OllamaExtractor` for the
+documents (or the parts of a document) that don't match.
+
+This isn't a hunch: a 2026 local-LLM structured-extraction study found Gemma3
+"in all study programs in LLM-only mode, all data categories showed errors,
+but it is perfect in hybrid mode (with regex)"[^1] — the same LLM, far more
+reliable once a deterministic pass handles the well-anchored fields first and
+the model only has to cover genuinely ambiguous text.
+
+[^1]: [Frugal Knowledge Graph Construction with Local LLMs](https://arxiv.org/pdf/2604.11104)
+
+The library doesn't build this in for you (a table format that's clean for
+one source is noise for another, so a one-size-fits-all parser would be
+wrong more often than it's right) — but the pattern is a few lines on top of
+what's already here:
+
+```python
+import re
+from pydantic import BaseModel
+from ollama_pydantic_extractor import OllamaExtractor
+
+class LineItem(BaseModel):
+    name: str
+    amount: float
+
+# A markdown pipe-table row: "| Steel | 1234.5 |"
+_ROW_RE = re.compile(r"^\|\s*([A-Za-z][\w &\-/().,']{2,60})\s*\|\s*([\d,]+\.?\d*)\s*\|")
+
+def try_deterministic(markdown_text: str) -> list[LineItem] | None:
+    """Returns parsed items if the text has a real table to parse,
+    or None if it doesn't -- None means "fall back to the LLM", not "no data"."""
+    rows = [m for line in markdown_text.splitlines() if (m := _ROW_RE.match(line))]
+    if not rows:
+        return None
+    return [LineItem(name=m.group(1).strip(), amount=float(m.group(2).replace(",", ""))) for m in rows]
+
+def extract_line_items(markdown_text: str, extractor: OllamaExtractor) -> list[LineItem]:
+    deterministic = try_deterministic(markdown_text)
+    if deterministic is not None:
+        return deterministic  # 0 Ollama calls for this document
+    prompt = f"Extract line items (name, amount) from:\n\n{markdown_text}"
+    return extractor.extract(prompt, schema=LineItem, many=True) or []
+```
+
+The flowchart above shows where this slots in: right after the markdown is
+produced, before any prompt is built. A document that matches skips the
+entire Ollama branch (prompt build, model call, retries, validation) and
+goes straight to Result.
+
 ## How It Works Under the Hood
 
 When you call `extract()`, the library:

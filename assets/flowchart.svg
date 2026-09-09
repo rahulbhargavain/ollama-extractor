@@ -1,4 +1,4 @@
-<svg viewBox="0 0 1000 900" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<svg viewBox="0 0 1000 1050" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
@@ -6,9 +6,12 @@
     <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#c96a6a"/>
     </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4fae6c"/>
+    </marker>
   </defs>
 
-  <rect x="0" y="0" width="1000" height="900" fill="#ffffff"/>
+  <rect x="0" y="0" width="1000" height="1050" fill="#ffffff"/>
   <text x="30" y="0" font-size="0"> </text>
 
   <!-- Stage 1 group -->
@@ -17,13 +20,13 @@
   <text x="45" y="30" font-size="13" font-weight="600" fill="#888">1. VLM PDF Parser (vlm_pdf_parser.py)</text>
 
   <!-- Stage 2 group -->
-  <rect x="30" y="422" width="880" height="350" rx="10" fill="none" stroke="#ddd" stroke-dasharray="4 3"/>
+  <rect x="30" y="422" width="880" height="470" rx="10" fill="none" stroke="#ddd" stroke-dasharray="4 3"/>
   <text x="45" y="440" font-size="13" font-weight="600" fill="#888">2. Ollama Pydantic Extractor (ollama_pydantic_extractor.py)</text>
 
   <!-- Result label -->
-  <text x="45" y="810" font-size="13" font-weight="600" fill="#888">Result</text>
+  <text x="45" y="960" font-size="13" font-weight="600" fill="#888">Result</text>
 
-  <!-- ===== Node styles: blue=I/O, green=processing, yellow=cache/decision/retry-red=failure, gray=terminal ===== -->
+  <!-- ===== Node styles: blue=I/O, green=processing, yellow=cache/decision/retry, red=failure, gray=terminal ===== -->
 
   <!-- Node 1: PDFs -->
   <rect x="280" y="45" width="340" height="50" rx="6" fill="#eef4ff" stroke="#6b8fd6"/>
@@ -49,43 +52,55 @@
   <rect x="280" y="350" width="340" height="50" rx="6" fill="#eef4ff" stroke="#6b8fd6"/>
   <text x="450" y="380" font-size="13" text-anchor="middle" fill="#25406b">parsed_markdown/*.md</text>
 
+  <!-- Node 4.5: deterministic pre-pass (NEW) -->
+  <rect x="280" y="450" width="340" height="72" rx="6" fill="#fff8e6" stroke="#d9a943"/>
+  <text x="450" y="472" font-size="12" text-anchor="middle" fill="#6b4f10">Deterministic pre-pass (optional, your code)</text>
+  <text x="450" y="489" font-size="10" text-anchor="middle" fill="#6b4f10">regex / markdown-table parse of the .md text</text>
+  <text x="450" y="505" font-size="10" text-anchor="middle" fill="#6b4f10">e.g. a "| Item | Cost | % |" style table</text>
+
+  <!-- Node: deterministic success (NEW) -->
+  <rect x="680" y="450" width="220" height="72" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
+  <text x="790" y="475" font-size="11" text-anchor="middle" fill="#1f5c33">Parsed with confidence</text>
+  <text x="790" y="491" font-size="10" text-anchor="middle" fill="#1f5c33">0 Ollama calls this document</text>
+  <text x="790" y="507" font-size="10" text-anchor="middle" fill="#1f5c33">-&gt; skip straight to Result</text>
+
   <!-- Node 5: prompt+schema -->
-  <rect x="280" y="450" width="340" height="60" rx="6" fill="#eef4ff" stroke="#6b8fd6"/>
-  <text x="450" y="475" font-size="12" text-anchor="middle" fill="#25406b">Prompt (built from .md text)</text>
-  <text x="450" y="493" font-size="12" text-anchor="middle" fill="#25406b">+ JSON schema from Pydantic model</text>
+  <rect x="280" y="560" width="340" height="60" rx="6" fill="#eef4ff" stroke="#6b8fd6"/>
+  <text x="450" y="585" font-size="12" text-anchor="middle" fill="#25406b">Prompt (built from .md text)</text>
+  <text x="450" y="603" font-size="12" text-anchor="middle" fill="#25406b">+ JSON schema from Pydantic model</text>
 
   <!-- Node 6: Ollama call -->
-  <rect x="280" y="550" width="340" height="60" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
-  <text x="450" y="575" font-size="12" text-anchor="middle" fill="#1f5c33">Ollama /api/generate</text>
-  <text x="450" y="593" font-size="11" text-anchor="middle" fill="#1f5c33">format = schema, stream = false</text>
+  <rect x="280" y="660" width="340" height="60" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
+  <text x="450" y="685" font-size="12" text-anchor="middle" fill="#1f5c33">Ollama /api/generate</text>
+  <text x="450" y="703" font-size="11" text-anchor="middle" fill="#1f5c33">format = schema, stream = false</text>
 
   <!-- Side: network/parse failure -->
-  <rect x="680" y="540" width="220" height="80" rx="6" fill="#fdeaea" stroke="#c96a6a"/>
-  <text x="790" y="562" font-size="11" text-anchor="middle" fill="#7a2626">Timeout / connection error /</text>
-  <text x="790" y="578" font-size="11" text-anchor="middle" fill="#7a2626">unparseable response</text>
-  <text x="790" y="596" font-size="10" text-anchor="middle" fill="#7a2626">logged (logger.warning)</text>
-  <text x="790" y="611" font-size="10" text-anchor="middle" fill="#7a2626">retried up to max_retries</text>
+  <rect x="680" y="650" width="220" height="80" rx="6" fill="#fdeaea" stroke="#c96a6a"/>
+  <text x="790" y="672" font-size="11" text-anchor="middle" fill="#7a2626">Timeout / connection error /</text>
+  <text x="790" y="688" font-size="11" text-anchor="middle" fill="#7a2626">unparseable response</text>
+  <text x="790" y="706" font-size="10" text-anchor="middle" fill="#7a2626">logged (logger.warning)</text>
+  <text x="790" y="721" font-size="10" text-anchor="middle" fill="#7a2626">retried up to max_retries</text>
 
   <!-- Node 7: validate -->
-  <rect x="280" y="670" width="340" height="60" rx="6" fill="#fff8e6" stroke="#d9a943"/>
-  <text x="450" y="695" font-size="12" text-anchor="middle" fill="#6b4f10">schema.model_validate()</text>
-  <text x="450" y="713" font-size="11" text-anchor="middle" fill="#6b4f10">per-item if many=True</text>
+  <rect x="280" y="780" width="340" height="60" rx="6" fill="#fff8e6" stroke="#d9a943"/>
+  <text x="450" y="805" font-size="12" text-anchor="middle" fill="#6b4f10">schema.model_validate()</text>
+  <text x="450" y="823" font-size="11" text-anchor="middle" fill="#6b4f10">per-item if many=True</text>
 
   <!-- Side: validation failure -->
-  <rect x="680" y="660" width="220" height="80" rx="6" fill="#fdeaea" stroke="#c96a6a"/>
-  <text x="790" y="682" font-size="11" text-anchor="middle" fill="#7a2626">ValidationError</text>
-  <text x="790" y="698" font-size="10" text-anchor="middle" fill="#7a2626">logged; error text appended</text>
-  <text x="790" y="713" font-size="10" text-anchor="middle" fill="#7a2626">to prompt for self-healing</text>
-  <text x="790" y="728" font-size="10" text-anchor="middle" fill="#7a2626">retry (up to max_retries)</text>
+  <rect x="680" y="770" width="220" height="80" rx="6" fill="#fdeaea" stroke="#c96a6a"/>
+  <text x="790" y="792" font-size="11" text-anchor="middle" fill="#7a2626">ValidationError</text>
+  <text x="790" y="808" font-size="10" text-anchor="middle" fill="#7a2626">logged; error text appended</text>
+  <text x="790" y="823" font-size="10" text-anchor="middle" fill="#7a2626">to prompt for self-healing</text>
+  <text x="790" y="838" font-size="10" text-anchor="middle" fill="#7a2626">retry (up to max_retries)</text>
 
   <!-- Outcomes -->
-  <rect x="280" y="790" width="340" height="65" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
-  <text x="450" y="817" font-size="12" text-anchor="middle" fill="#1f5c33">Validated Pydantic instance(s)</text>
-  <text x="450" y="835" font-size="10" text-anchor="middle" fill="#1f5c33">returned from extract()</text>
+  <rect x="280" y="900" width="340" height="65" rx="6" fill="#eaf7ee" stroke="#4fae6c"/>
+  <text x="450" y="927" font-size="12" text-anchor="middle" fill="#1f5c33">Validated Pydantic instance(s)</text>
+  <text x="450" y="945" font-size="10" text-anchor="middle" fill="#1f5c33">from extract(), or from your pre-pass</text>
 
-  <rect x="680" y="790" width="220" height="65" rx="6" fill="#f2f2f2" stroke="#bbb"/>
-  <text x="790" y="817" font-size="12" text-anchor="middle" fill="#555">None</text>
-  <text x="790" y="835" font-size="10" text-anchor="middle" fill="#555">max_retries exhausted</text>
+  <rect x="680" y="900" width="220" height="65" rx="6" fill="#f2f2f2" stroke="#bbb"/>
+  <text x="790" y="927" font-size="12" text-anchor="middle" fill="#555">None</text>
+  <text x="790" y="945" font-size="10" text-anchor="middle" fill="#555">max_retries exhausted</text>
 
   <!-- ===== Arrows: stage 1 ===== -->
   <path d="M450,95 V130" stroke="#555" fill="none" marker-end="url(#arrow)"/>
@@ -101,25 +116,35 @@
 
   <!-- ===== Arrows: stage 2 ===== -->
   <path d="M450,400 V450" stroke="#555" fill="none" marker-end="url(#arrow)"/>
-  <path d="M450,510 V550" stroke="#555" fill="none" marker-end="url(#arrow)"/>
 
-  <path d="M620,580 H680" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
-  <path d="M790,540 V520 H560 V550" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
-  <text x="650" y="516" font-size="10" fill="#7a2626">retry, same prompt</text>
+  <path d="M620,486 H680" stroke="#4fae6c" fill="none" marker-end="url(#arrowGreen)"/>
+  <text x="628" y="480" font-size="9" fill="#1f5c33">match</text>
 
-  <path d="M450,610 V670" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <path d="M450,522 V560" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+  <text x="465" y="543" font-size="10" fill="#555">no confident match</text>
 
-  <path d="M620,700 H680" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
-  <path d="M900,700 H930 V480 H620" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
-  <text x="835" y="476" font-size="10" fill="#7a2626">re-prompt with</text>
-  <text x="835" y="489" font-size="10" fill="#7a2626">validation error</text>
+  <path d="M450,620 V660" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+
+  <path d="M620,690 H680" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
+  <path d="M790,650 V630 H560 V660" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
+  <text x="650" y="626" font-size="10" fill="#7a2626">retry, same prompt</text>
+
+  <path d="M450,720 V780" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+
+  <path d="M620,810 H680" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
+  <path d="M900,810 H930 V590 H620" stroke="#c96a6a" fill="none" marker-end="url(#arrowRed)"/>
+  <text x="835" y="586" font-size="10" fill="#7a2626">re-prompt with</text>
+  <text x="835" y="599" font-size="10" fill="#7a2626">validation error</text>
 
   <!-- ===== Arrows: outcomes ===== -->
-  <path d="M450,730 V790" stroke="#4fae6c" fill="none" marker-end="url(#arrow)"/>
+  <path d="M450,840 V900" stroke="#4fae6c" fill="none" marker-end="url(#arrow)"/>
 
-  <path d="M790,740 V790" stroke="#bbb" fill="none" marker-end="url(#arrow)"/>
-  <text x="800" y="763" font-size="9" fill="#888">exhausted</text>
+  <path d="M790,850 V900" stroke="#bbb" fill="none" marker-end="url(#arrow)"/>
+  <text x="800" y="877" font-size="9" fill="#888">exhausted</text>
 
-  <path d="M900,580 H955 V825 H900" stroke="#bbb" fill="none" marker-end="url(#arrow)"/>
-  <text x="905" y="576" font-size="9" fill="#888">exhausted</text>
+  <path d="M900,690 H955 V945 H900" stroke="#bbb" fill="none" marker-end="url(#arrow)"/>
+  <text x="905" y="686" font-size="9" fill="#888">exhausted</text>
+
+  <!-- Deterministic success merges straight into the same Result box -->
+  <path d="M790,522 V932 H620" stroke="#4fae6c" fill="none" marker-end="url(#arrow)"/>
 </svg>
