@@ -7,9 +7,13 @@ Model weights cache to ~/.cache/huggingface by default (override with
 --model-cache-dir) so the download only happens once, independent of
 --output-dir.
 Converted markdown caches to the output directory along with a _manifest.json,
-keyed on (filename, size, mtime) -- a source PDF that hasn't changed is never
-re-run. Note: this cache key is not a content hash, so mtimes lost across a
-fresh git clone/Docker copy will look "changed" on the first run there.
+keyed on a SHA-256 of each PDF's content -- a source PDF that hasn't changed
+is never re-run, even after a fresh git clone or Docker copy resets mtimes.
+(Hashing a PDF takes milliseconds; the VLM pass it avoids takes minutes.)
+Manifests from older versions, keyed on (filename, size, mtime), are accepted
+and upgraded in place without reconverting anything.
+
+Exit status: 0 on success, 1 if any PDF failed to convert, 2 for bad arguments.
 """
 from __future__ import annotations
 
@@ -28,29 +32,70 @@ def slugify(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", name)
 
 
-def unique_slug(stem: str, taken: set[str]) -> str:
-    """Slugify, disambiguating collisions (e.g. 'a.b' and 'a_b' both -> 'a_b')."""
+def unique_slug(stem: str, taken: set[str], disambiguator: str | None = None) -> str:
+    """Slugify, disambiguating collisions (e.g. 'a.b' and 'a_b' both -> 'a_b',
+    or three 'report.pdf's in different subdirectories). The suffix hashes
+    `disambiguator` (pass the PDF's relative path, which is unique) and
+    lengthens until the name is free, so no two PDFs share an output file."""
     base = slugify(stem)
     if base not in taken:
         taken.add(base)
         return base
-    suffix = hashlib.sha1(stem.encode()).hexdigest()[:8]
-    candidate = f"{base}_{suffix}"
+    digest = hashlib.sha1((disambiguator or stem).encode()).hexdigest()
+    for length in range(8, len(digest) + 1):
+        candidate = f"{base}_{digest[:length]}"
+        if candidate not in taken:
+            taken.add(candidate)
+            return candidate
+    counter = 2
+    while f"{base}_{digest}_{counter}" in taken:
+        counter += 1
+    candidate = f"{base}_{digest}_{counter}"
     taken.add(candidate)
     return candidate
 
 
 def load_manifest(manifest_path: Path) -> dict:
-    if manifest_path.exists():
-        return json.loads(manifest_path.read_text(encoding="utf-8"))
-    return {}
+    """The manifest, or {} if absent. A corrupt manifest (e.g. from a run
+    killed mid-write by an older version) is moved aside, not fatal: the
+    markdown files themselves are still there, and existing .md names are
+    reserved separately so nothing gets overwritten."""
+    if not manifest_path.exists():
+        return {}
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if isinstance(manifest, dict):
+            return manifest
+        raise ValueError(f"expected a JSON object, got {type(manifest).__name__}")
+    except ValueError as e:
+        backup = manifest_path.with_name(manifest_path.name + ".corrupt")
+        os.replace(manifest_path, backup)
+        print(f"WARNING: {manifest_path.name} was unreadable ({e}); moved it to {backup.name} "
+              "and starting a fresh manifest.", file=sys.stderr)
+        return {}
 
 
 def save_manifest(manifest: dict, manifest_path: Path) -> None:
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    """Write to a temp file and swap it in, so a killed run can't leave a
+    truncated manifest behind."""
+    tmp_path = manifest_path.with_name(manifest_path.name + ".tmp")
+    tmp_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    os.replace(tmp_path, manifest_path)
 
 
 def cache_key(path: Path) -> str:
+    """SHA-256 of the file's content: unchanged content -> same key, whatever
+    its mtime or location."""
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
+
+
+def legacy_cache_key(path: Path) -> str:
+    """The pre-content-hash key, (name, size, mtime), recognised so existing
+    caches upgrade without reconverting."""
     stat = path.stat()
     raw = f"{path.name}|{stat.st_size}|{int(stat.st_mtime)}"
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
@@ -83,7 +128,7 @@ def build_converter(model_spec_name: str):
         raise SystemExit(
             f"Unknown VLM model spec {model_spec_name!r}. "
             f"Check docling.datamodel.vlm_model_specs for valid names."
-        )
+        ) from None
 
     device = AcceleratorDevice.CUDA if torch.cuda.is_available() else AcceleratorDevice.CPU
     print(f"Docling VLM pipeline device: {device} "
@@ -125,28 +170,32 @@ def main():
     else:
         os.environ.setdefault("HF_HOME", str(Path.home() / ".cache" / "huggingface"))
 
-    if not input_dir.exists():
-        print(f"Input directory does not exist: {input_dir}")
-        return
+    if not input_dir.is_dir():
+        print(f"Input directory does not exist: {input_dir}", file=sys.stderr)
+        return 2
 
     targets = find_pdfs(input_dir, args.recursive)
 
     if not targets:
         print(f"No PDFs found in {input_dir}{' (recursive)' if args.recursive else ''}.")
-        return
+        return 0
 
     print(f"Found {len(targets)} PDFs in {input_dir}:")
     for p in targets:
         print(f"  {p.relative_to(input_dir)}")
 
     if args.list:
-        return
+        return 0
 
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest = load_manifest(manifest_path)
 
-    taken_slugs = {entry["out"][:-3] for entry in manifest.values() if "out" in entry}
+    # Reserve every name already in use -- by the manifest and by any .md
+    # already on disk -- so a new PDF can never overwrite another's output.
+    taken_slugs = {entry["out"][:-3] for entry in manifest.values() if isinstance(entry, dict) and "out" in entry}
+    taken_slugs |= {md.stem for md in output_dir.glob("*.md")}
     to_convert = []
+    upgraded = False
     for p in targets:
         key = cache_key(p)
         manifest_key = str(p.relative_to(input_dir))
@@ -154,18 +203,25 @@ def main():
         if existing.get("out"):
             out_path = output_dir / existing["out"]
         else:
-            out_path = output_dir / f"{unique_slug(p.stem, taken_slugs)}.md"
-        if not args.force and existing.get("key") == key and out_path.exists():
+            out_path = output_dir / f"{unique_slug(p.stem, taken_slugs, manifest_key)}.md"
+        fresh = existing.get("key") in (key, legacy_cache_key(p)) and out_path.exists()
+        if not args.force and fresh:
+            if existing.get("key") != key:  # old-style key: upgrade, don't reconvert
+                manifest[manifest_key] = {**existing, "key": key}
+                upgraded = True
             continue
         to_convert.append((p, manifest_key, key, out_path))
+    if upgraded:
+        save_manifest(manifest, manifest_path)
 
     print(f"\n{len(targets) - len(to_convert)} already cached and unchanged, "
           f"{len(to_convert)} need conversion.")
 
     if not to_convert:
-        return
+        return 0
 
     converter = build_converter(args.model)
+    failures = []
 
     for i, (p, manifest_key, key, out_path) in enumerate(to_convert, 1):
         t0 = time.time()
@@ -175,6 +231,7 @@ def main():
             md = result.document.export_to_markdown()
         except Exception:
             print(f"  FAILED:\n{traceback.format_exc()}", file=sys.stderr)
+            failures.append(manifest_key)
             continue
 
         out_path.write_text(md, encoding="utf-8")
@@ -184,7 +241,11 @@ def main():
         print(f"  -> {out_path.name} ({len(md)} chars, {elapsed:.1f}s)", file=sys.stderr)
 
     print(f"\nDone. Markdown cached under {output_dir}/, manifest at {manifest_path}")
+    if failures:
+        print(f"{len(failures)} of {len(to_convert)} PDF(s) failed to convert: {', '.join(failures)}", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

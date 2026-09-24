@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 parsed_markdown/
 .docling_models/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/

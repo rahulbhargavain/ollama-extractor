@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ollama-extractor"
+version = "0.1.0"
+description = "Local document tools: PDF -> Markdown with Docling's VLM pipeline, and schema-validated JSON extraction with Ollama + Pydantic."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+# The extractor needs only these two; the PDF parser's heavy dependencies
+# (Docling, torch) are an extra so extractor-only users don't pull in GBs.
+dependencies = [
+    "requests>=2.31,<3",
+    "pydantic>=2.6,<3",
+]
+
+[project.optional-dependencies]
+pdf = [
+    "docling>=2.0,<3",
+    "torch>=2.2,<3",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+vlm-pdf-parser = "vlm_pdf_parser:main"
+
+[tool.setuptools]
+py-modules = ["ollama_pydantic_extractor", "vlm_pdf_parser"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B"]
