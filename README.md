@@ -11,13 +11,13 @@ A toolkit for processing unstructured documents locally. It contains two indepen
 
 ## 1. VLM PDF Parser (`vlm_pdf_parser.py`)
 
-A GPU-accelerated CLI tool for converting directories of PDFs to Markdown. It features a smart caching layer that hashes file names, sizes, and modification times so you never accidentally re-run an expensive VLM pass on an unchanged file. Matching is case-insensitive (`.pdf`/`.PDF`) and can optionally recurse into subdirectories.
+A GPU-accelerated CLI tool for converting directories of PDFs to Markdown. It caches each result against a SHA-256 of the PDF's content, so an unchanged file is never re-run through the expensive VLM pass, even after a fresh `git clone` or Docker copy resets modification times. (Hashing takes milliseconds; the conversion it skips takes minutes.) Caches written by earlier versions, keyed on name, size and mtime, are upgraded in place without reconverting.
 
-Note on the cache: the key is `(name, size, mtime)`, not a content hash. That's cheap and fine for local edit-and-rerun workflows, but a fresh `git clone` or Docker copy resets mtimes, so the first run there will look like everything changed and reconvert.
+Matching is case-insensitive (`.pdf`/`.PDF`) and can recurse into subdirectories. Same-named PDFs in different folders get distinct output files. The manifest is written atomically, and a corrupt one is set aside rather than crashing the run. The exit status is 0 on success, 1 if any PDF failed to convert, and 2 for bad arguments, so it can gate a script or CI step.
 
 ### Dependencies
 ```bash
-pip install -r requirements.txt
+pip install -e ".[pdf]"        # or: pip install -r requirements.txt
 ```
 
 ### Usage (CLI)
@@ -54,16 +54,26 @@ A robust, generic utility for structured extraction using local LLMs (via Ollama
 ### Features
 
 - **Schema-Constrained Generation**: Automatically derives JSON schemas from your Pydantic models and passes them to Ollama's `format` parameter.
-- **Self-Healing Retries**: If the model hallucinates an incorrect data type or misses a required field, the extractor catches the Pydantic `ValidationError` and feeds the exact error message back into a retry prompt, allowing the model to correct its mistake.
-- **Many vs Single**: Built-in support for extracting a single object or an array of objects (`many=True`).
+- **Self-Healing Retries**: If the model returns a wrong data type or misses a required field, the extractor catches the Pydantic `ValidationError` and sends the model its previous answer plus the exact errors, so it can correct them.
+- **Many vs Single**: Built-in support for extracting a single object or an array of objects (`many=True`), including nested models.
+- **Deterministic by default**: calls use `temperature: 0`, so the same input gives the same answer. Pass `options={...}` to change that or to set any other Ollama option (`num_ctx`, `seed`, ...).
 
 ### Dependencies
 ```bash
-pip install -r requirements.txt
+pip install -e .               # just requests + pydantic; no torch/docling needed
 ```
 *Requires Ollama running locally (default: `http://localhost:11434`).*
 
-Failures are logged via the standard `logging` module (network errors, unparseable responses, and per-item validation misses each get a `logger.warning`) rather than silently swallowed — configure `logging.basicConfig(level=logging.WARNING)` in your own script to see them. A connection failure or timeout now also retries (up to `max_retries`, unmodified prompt) instead of giving up immediately, separately from the validation-error retry path.
+### What `extract()` returns
+
+| Situation | `many=False` | `many=True` |
+|---|---|---|
+| Success | the model instance | a list of instances |
+| The text contains no matching items | — | `[]`, returned immediately (an empty answer is valid, not a failure) |
+| Some items still invalid after all retries | — | the valid items; the rest are logged |
+| Extraction failed | `None` | `None` |
+
+Timeouts, connection errors, Ollama server errors (5xx) and unparseable responses are retried with the unmodified prompt, up to `max_retries`. Client errors such as a model that hasn't been pulled (HTTP 404) are not retried, and Ollama's own message ("model 'x' not found") is logged. All failures go through the standard `logging` module; configure `logging.basicConfig(level=logging.WARNING)` in your own script to see them.
 
 ### Usage (Python)
 
@@ -169,5 +179,17 @@ When you call `extract()`, the library:
 1. Generates a JSON schema from your Pydantic model (`schema.model_json_schema()`).
 2. Sends the prompt and the schema constraint to Ollama.
 3. Attempts to parse the response with `schema.model_validate(raw)`.
-4. If a `ValidationError` is raised, it automatically re-prompts the model with: `"Your previous answer was invalid: {e}. Return corrected JSON only."`
-5. Returns the fully validated Pydantic model(s), or `None` if it ultimately fails.
+4. If a `ValidationError` is raised, it re-prompts the model with the original prompt, its previous answer, and the validation errors, ending with `"Return corrected JSON only."`
+5. Returns the fully validated Pydantic model(s), or `None` if it ultimately fails (see the table above).
+
+For `many=True`, the item schema's `$defs` are moved to the root of the array schema, so nested models (`$ref: "#/$defs/..."`) stay resolvable.
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest          # stubs Ollama and Docling: no server, GPU or model download needed
+ruff check .
+```
+
+GitHub Actions runs both on every pull request.
