@@ -126,3 +126,28 @@ def test_list_only_converts_nothing(tmp_path, run):
     make_pdf(tmp_path / "in" / "a.PDF")
     code, converter = run("--input-dir", str(tmp_path / "in"), "--list")
     assert code == 0 and converter.converted == []
+
+
+def test_changing_the_model_reconverts_and_records_it(tmp_path, run):
+    make_pdf(tmp_path / "in" / "a.pdf")
+    out = tmp_path / "out"
+    args = ("--input-dir", str(tmp_path / "in"), "--output-dir", str(out))
+    run(*args, "--model", "SMOLDOCLING_TRANSFORMERS")
+    _code, converter = run(*args, "--model", "SMOLDOCLING_TRANSFORMERS")
+    assert converter.converted == []  # same model: cached
+    _code, converter = run(*args)  # default model: different Markdown, so reconvert
+    assert len(converter.converted) == 1
+    assert json.loads((out / "_manifest.json").read_text())["a.pdf"]["model"] == parser.DEFAULT_MODEL
+
+
+def test_entry_without_a_recorded_model_counts_as_the_default(tmp_path, run):
+    pdf = make_pdf(tmp_path / "in" / "a.pdf")
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "a.md").write_text("# old")
+    (out / "_manifest.json").write_text(json.dumps({"a.pdf": {"key": parser.cache_key(pdf), "out": "a.md"}}))
+    args = ("--input-dir", str(tmp_path / "in"), "--output-dir", str(out))
+    _code, converter = run(*args)
+    assert converter.converted == []
+    _code, converter = run(*args, "--model", "SMOLDOCLING_TRANSFORMERS")
+    assert len(converter.converted) == 1

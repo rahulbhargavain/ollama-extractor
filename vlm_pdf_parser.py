@@ -10,6 +10,9 @@ Converted markdown caches to the output directory along with a _manifest.json,
 keyed on a SHA-256 of each PDF's content -- a source PDF that hasn't changed
 is never re-run, even after a fresh git clone or Docker copy resets mtimes.
 (Hashing a PDF takes milliseconds; the VLM pass it avoids takes minutes.)
+Each entry also records which VLM produced it: changing --model reconverts, because
+the same PDF through a different model gives different Markdown. Entries from older
+versions have no model recorded and are taken to be from the default model.
 Manifests from older versions, keyed on (filename, size, mtime), are accepted
 and upgraded in place without reconverting anything.
 
@@ -26,6 +29,9 @@ import sys
 import time
 import traceback
 from pathlib import Path
+
+
+DEFAULT_MODEL = "GRANITEDOCLING_TRANSFORMERS"
 
 
 def slugify(name: str) -> str:
@@ -155,8 +161,8 @@ def main():
     ap.add_argument("--recursive", action="store_true", help="Also search subdirectories of --input-dir")
     ap.add_argument("--model-cache-dir", type=str, default=None,
                      help="Where to cache downloaded VLM weights (default: HF_HOME env var, or ~/.cache/huggingface)")
-    ap.add_argument("--model", type=str, default="GRANITEDOCLING_TRANSFORMERS",
-                     help="Attribute name in docling.datamodel.vlm_model_specs to use (default: GRANITEDOCLING_TRANSFORMERS)")
+    ap.add_argument("--model", type=str, default=DEFAULT_MODEL,
+                     help=f"Attribute name in docling.datamodel.vlm_model_specs to use (default: {DEFAULT_MODEL})")
     ap.add_argument("--force", action="store_true", help="Re-convert even if a fresh cache entry exists")
     ap.add_argument("--list", action="store_true", help="Only list matching PDFs, don't convert")
     args = ap.parse_args()
@@ -204,7 +210,8 @@ def main():
             out_path = output_dir / existing["out"]
         else:
             out_path = output_dir / f"{unique_slug(p.stem, taken_slugs, manifest_key)}.md"
-        fresh = existing.get("key") in (key, legacy_cache_key(p)) and out_path.exists()
+        same_model = existing.get("model", DEFAULT_MODEL) == args.model
+        fresh = existing.get("key") in (key, legacy_cache_key(p)) and same_model and out_path.exists()
         if not args.force and fresh:
             if existing.get("key") != key:  # old-style key: upgrade, don't reconvert
                 manifest[manifest_key] = {**existing, "key": key}
@@ -236,7 +243,10 @@ def main():
 
         out_path.write_text(md, encoding="utf-8")
         elapsed = time.time() - t0
-        manifest[manifest_key] = {"key": key, "out": out_path.name, "chars": len(md), "seconds": round(elapsed, 1)}
+        manifest[manifest_key] = {
+            "key": key, "model": args.model, "out": out_path.name,
+            "chars": len(md), "seconds": round(elapsed, 1),
+        }
         save_manifest(manifest, manifest_path)
         print(f"  -> {out_path.name} ({len(md)} chars, {elapsed:.1f}s)", file=sys.stderr)
 
