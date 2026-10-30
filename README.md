@@ -62,7 +62,7 @@ A robust, generic utility for structured extraction using local LLMs (via Ollama
 ```bash
 pip install -e .               # just requests + pydantic; no torch/docling needed
 ```
-*Requires Ollama running locally (default: `http://localhost:11434`).*
+*Requires Ollama running locally. `OllamaExtractor` posts to `http://localhost:11434/api/generate` by default; to use another host or port, pass the full endpoint, e.g. `OllamaExtractor(ollama_url="http://gpu-box:11434/api/generate")`.*
 
 ### What `extract()` returns
 
